@@ -1,34 +1,32 @@
-# Build local monorepo image
-# docker build --no-cache -t  flowise .
+FROM n8nio/n8n:latest
 
-# Run image
-# docker run -d -p 3000:3000 flowise
+USER root
 
-FROM node:20-alpine
-RUN apk add --update libc6-compat python3 make g++
-# needed for pdfjs-dist
-RUN apk add --no-cache build-base cairo-dev pango-dev
+# Install FFMPEG and other necessary tools
+RUN apk update && apk add --no-cache \
+    ffmpeg \
+    && rm -rf /var/cache/apk/*
 
-# Install Chromium
-RUN apk add --no-cache chromium
+# Install n8n-nodes-base to ensure compatibility with community nodes
+RUN npm install -g n8n-nodes-base
 
-#install PNPM globaly
-RUN npm install -g pnpm
+# Install specified community nodes
+RUN npm install -g n8n-nodes-ffmpeg n8n-nodes-elevenlabs
 
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Set an environment variable to allow external modules (required for community nodes)
+ENV NODE_FUNCTION_ALLOW_EXTERNAL=* 
 
-ENV NODE_OPTIONS=--max-old-space-size=8192
+# Create a directory for custom nodes
+RUN mkdir -p /home/node/.n8n/custom
 
-WORKDIR /usr/src
+# Switch back to the node user
+USER node
 
-# Copy app source
-COPY . .
+# Set the working directory
+WORKDIR /home/node
 
-RUN pnpm install
+# Expose the default n8n port
+EXPOSE 5678
 
-RUN pnpm build
-
-EXPOSE 3000
-
-CMD [ "pnpm", "start" ]
+# Start n8n
+CMD ["n8n", "start"]
